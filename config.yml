@@ -1,0 +1,23 @@
+maxDistance: 50 #maximum distance at which a player can be heard, this can be exceeded if entropyRandomFlucuation is not 0
+entropyRandomFlucuation: 0.05 #between 0 and 1, set to 0 if you want to always lose the same amount of characters per distance
+obeyInverseSquareLaw: true #http://hyperphysics.phy-astr.gsu.edu/hbase/Acoustic/invsqs.html, becomes linear with distance if false
+opsAlwaysHeard: true
+opsHearEverything: true
+
+messageWhenNoListeners: #When nobody hears their message should the player be alerted?
+  enabled: false
+  message: "Nobody heard you..."
+
+hideSender: #When a player is too far, their username will be unknown but their message may be heard
+  enabled: true
+  minEntropy: 0.85 #between 0 and 1, when this is exceeded, username is hidden
+  senderName: "?" #e.g: (<?> message) instead of (<username> message)
+
+lineOfSight: #if the receiver is not in line of sight with sender, should the entropy be increased?
+  enabled: true
+  weighting: 0.2 #Between 0 and 1. Having weighting equal to 0 is the same as disabiling this feature but performancewise it's better to just disable it
+
+senderFacing: #if the sender is not facing the receiver, should the entropy be increased? This is proportional to the angle difference
+  enabled: true
+  weighting: 0.15 #between 0 and 1
+
