@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.Random;
+import java.util.HashMap;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
@@ -15,9 +16,11 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 public class AcousticChat extends JavaPlugin implements Listener {
 	public static Random r;
+	public HashMap<Player, Long> cooldown;
 	public static final char vowels[] = {'a', 'e', 'i', 'o', 'u'};
 	
 	private static Logger log = null;
@@ -35,23 +38,36 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		log.info("Max distance set to " + getConfig().getInt("maxDistance"));
 	}
 	
+	@EventHandler
+	public void onPlayerQuit(PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+        cooldown.remove(player);
+    }
+	
 	@EventHandler (priority = EventPriority.LOW)
     public void AsyncPlayerChat(AsyncPlayerChatEvent event) {
 		if (event.isCancelled()) return;
 		Player sender = event.getPlayer();
 		String message = "<" + sender.getName() + "> " + event.getMessage();
 		log.info(message);
+		
+		sender.sendMessage(message);
 		event.setCancelled(true);
 		boolean sentOne = false;
+
 		@SuppressWarnings("unchecked")
 		List<Player> players = (List<Player>) Bukkit.getOnlinePlayers();
+		
 		for (int i = 0;i < players.size();i++) {
 			Player p = players.get(i);
-			if ((sender.isOp() && getConfig().getBoolean("opsAlwaysHeard")) || p.getUniqueId().equals(sender.getUniqueId())) {
+			if (p.getUniqueId().equals(sender.getUniqueId())) continue; //message already sent to themselves
+			if ((sender.isOp() && getConfig().getBoolean("opsAlwaysHeard"))) {
 				p.sendMessage(message);
+				sentOne = true;
 				continue;
 			} else if (p.isOp() && getConfig().getBoolean("opsHearEverything")) {
 				p.sendMessage(message);
+				sentOne = sentOne || getConfig().getBoolean("messageWhenNoListeners.notifyIfOpHears");
 				continue;
 			}
 			double entropy = calcEntropy(sender, p);
@@ -62,9 +78,18 @@ public class AcousticChat extends JavaPlugin implements Listener {
 			p.sendMessage("<" + username + "> " + addNoise(event.getMessage(), entropy));
 			sentOne = true;
 		}
-		if (!getConfig().getBoolean("messageWhenNoListeners.enabled")) return;
-		if (!sentOne)
-			sender.sendMessage(fixColor(getConfig().getString("messageWhenNoListeners.message")));
+		if (!getConfig().getBoolean("messageWhenNoListeners.enabled") || sentOne) return;
+		
+		int cooltime = getConfig().getInt("messageWhenNoListeners.cooldown");
+		if (cooltime != 0 &&
+				cooldown.containsKey(sender) &&
+				System.currentTimeMillis() - cooldown.get(sender) < cooltime)
+			return;
+
+		sender.sendMessage(fixColor(getConfig().getString("messageWhenNoListeners.message")));
+		
+		if (cooltime == 0) return;
+		cooldown.put(sender, System.currentTimeMillis());
 	}
 	
 	private boolean isVowel(char c) {

@@ -6,6 +6,8 @@ opsHearEverything: true
 
 messageWhenNoListeners: #When nobody hears their message should the player be alerted?
   enabled: false
+  cooldown: 0 #Setting this to zero may slightly increase server performance
+  notifyIfOpHears: false
   message: "Nobody heard you..."
 
 hideSender: #When a player is too far, their username will be unknown but their message may be heard

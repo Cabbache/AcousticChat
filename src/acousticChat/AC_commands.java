@@ -24,12 +24,9 @@ public class AC_commands implements CommandExecutor{
 		}
 		if (args[0].equals("reload")) {
 			plugin.reloadConfig();
-			//plugin.getLogger().info("AcousticChat reloaded");
 			sender.sendMessage("AcousticChat reloaded");
 			return true;
-		}// else if (args[0].equals("bypass")) {
-			
-		//}
+		}
 		return false;
     }
 }
