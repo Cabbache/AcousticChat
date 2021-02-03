@@ -1,6 +1,6 @@
 name: AcousticChat
 main: acousticChat.AcousticChat
-version: 1.2
+version: 1.3
 api-version: 1.13
 commands:
   ac:

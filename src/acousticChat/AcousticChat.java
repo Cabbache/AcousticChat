@@ -30,6 +30,7 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		r = new Random();
 		log = getLogger();
 
+		cooldown = new HashMap<Player, Long>();//make sure this is before registerevents
 		getServer().getPluginManager().registerEvents(this, this);
 		getCommand("ac").setExecutor(new AC_commands(this));
 		saveResource("config.yml", false);
@@ -67,7 +68,7 @@ public class AcousticChat extends JavaPlugin implements Listener {
 				continue;
 			} else if (p.isOp() && getConfig().getBoolean("opsHearEverything")) {
 				p.sendMessage(message);
-				sentOne = sentOne || getConfig().getBoolean("messageWhenNoListeners.notifyIfOpHears");
+				sentOne = sentOne || !getConfig().getBoolean("messageWhenNoListeners.notifyIfOpHears");
 				continue;
 			}
 			double entropy = calcEntropy(sender, p);
@@ -80,7 +81,7 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		}
 		if (!getConfig().getBoolean("messageWhenNoListeners.enabled") || sentOne) return;
 		
-		int cooltime = getConfig().getInt("messageWhenNoListeners.cooldown");
+		int cooltime = getConfig().getInt("messageWhenNoListeners.cooldown") * 1000;
 		if (cooltime != 0 &&
 				cooldown.containsKey(sender) &&
 				System.currentTimeMillis() - cooldown.get(sender) < cooltime)
