@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.logging.Logger;
 import java.util.Random;
 import java.util.HashMap;
+import java.util.regex.Pattern;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
@@ -45,17 +46,28 @@ public class AcousticChat extends JavaPlugin implements Listener {
         cooldown.remove(player);
     }
 	
-	@EventHandler (priority = EventPriority.LOW)
-    public void AsyncPlayerChat(AsyncPlayerChatEvent event) {
-		if (event.isCancelled()) return;
+	private String applyFormat(String format, String username, String message) {
+		return format.replaceAll(Pattern.quote("%1$s"), username)
+				.replaceAll(Pattern.quote("%2$s"), message);
+	}
+	
+	@EventHandler (priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPlayerChat(AsyncPlayerChatEvent event) {
+		event.setCancelled(true);//from now on it will be handled manually
+		
 		Player sender = event.getPlayer();
-		String message = "<" + sender.getName() + "> " + event.getMessage();
+		String mformat = event.getFormat();
+		String senderName = sender.getDisplayName();
+		String messageText = event.getMessage();
+		
+		String message = applyFormat(mformat, senderName, messageText);
+
+		log.info("format: " + mformat);
 		log.info(message);
 		
 		sender.sendMessage(message);
-		event.setCancelled(true);
+		
 		boolean sentOne = false;
-
 		@SuppressWarnings("unchecked")
 		List<Player> players = (List<Player>) Bukkit.getOnlinePlayers();
 		
@@ -71,12 +83,13 @@ public class AcousticChat extends JavaPlugin implements Listener {
 				sentOne = sentOne || !getConfig().getBoolean("messageWhenNoListeners.notifyIfOpHears");
 				continue;
 			}
+			if (p.getWorld() != sender.getWorld()) continue;
+			
 			double entropy = calcEntropy(sender, p);
 			if (entropy > 1.0) continue;
-			String username = sender.getName();
 			if (getConfig().getBoolean("hideSender.enabled") && getConfig().getDouble("hideSender.minEntropy") < entropy)
-				username = fixColor(getConfig().getString("hideSender.senderName"));
-			p.sendMessage("<" + username + "> " + addNoise(event.getMessage(), entropy));
+				senderName = fixColor(getConfig().getString("hideSender.senderName"));
+			p.sendMessage(applyFormat(mformat, senderName, addNoise(messageText, entropy)));
 			sentOne = true;
 		}
 		if (!getConfig().getBoolean("messageWhenNoListeners.enabled") || sentOne) return;
