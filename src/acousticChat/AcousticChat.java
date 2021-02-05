@@ -5,7 +5,9 @@ import java.util.List;
 import java.util.logging.Logger;
 import java.util.Random;
 import java.util.HashMap;
+
 import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
@@ -47,8 +49,8 @@ public class AcousticChat extends JavaPlugin implements Listener {
     }
 	
 	private String applyFormat(String format, String username, String message) {
-		return format.replaceAll(Pattern.quote("%1$s"), username)
-				.replaceAll(Pattern.quote("%2$s"), message);
+		return format.replaceFirst(Pattern.quote("%1$s"), Matcher.quoteReplacement(username))
+				.replaceFirst(Pattern.quote("%2$s"), Matcher.quoteReplacement(message));
 	}
 	
 	@EventHandler (priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -63,6 +65,8 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		String message = applyFormat(mformat, senderName, messageText);
 
 		log.info(message);
+		
+		//getServer().getPluginManager().callEvent(event);
 		
 		sender.sendMessage(message);
 		
