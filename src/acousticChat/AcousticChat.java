@@ -62,7 +62,6 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		
 		String message = applyFormat(mformat, senderName, messageText);
 
-		log.info("format: " + mformat);
 		log.info(message);
 		
 		sender.sendMessage(message);
