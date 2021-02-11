@@ -1,19 +1,21 @@
 package acousticChat;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.Random;
+import java.util.Set;
 import java.util.HashMap;
-
+import java.util.Iterator;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.util.ArrayList;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -21,10 +23,16 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+/*
+			Credits to
+	https://github.com/cs-au-dk/dk.brics.automaton
+	https://github.com/mifmif/Generex
+*/
+import com.mifmif.common.regex.Generex;
+
 public class AcousticChat extends JavaPlugin implements Listener {
 	public static Random r;
 	public HashMap<Player, Long> cooldown;
-	public static final char vowels[] = {'a', 'e', 'i', 'o', 'u'};
 	
 	private static Logger log = null;
 	
@@ -33,12 +41,14 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		r = new Random();
 		log = getLogger();
 
-		cooldown = new HashMap<Player, Long>();//make sure this is before registerevents
+		cooldown = new HashMap<Player, Long>();//make sure this is before registerEvents
 		getServer().getPluginManager().registerEvents(this, this);
 		getCommand("ac").setExecutor(new AC_commands(this));
 		saveResource("config.yml", false);
 		
-		log.info("Hello from Cabbache");
+		log.info(addNoise("test hello the cake is a lie", 0.5));
+		
+		//log.info("Hello from Cabbache");//performance
 		log.info("Max distance set to " + getConfig().getInt("maxDistance"));
 	}
 	
@@ -55,25 +65,24 @@ public class AcousticChat extends JavaPlugin implements Listener {
 	
 	@EventHandler (priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerChat(AsyncPlayerChatEvent event) {
-		event.setCancelled(true);//from now on it will be handled manually
+		event.setCancelled(true);//from now on it will be handled here
 		
 		Player sender = event.getPlayer();
 		String mformat = event.getFormat();
 		String senderName = sender.getDisplayName();
 		String messageText = event.getMessage();
+		getConfig().getList("abc");
 		
 		String message = applyFormat(mformat, senderName, messageText);
-
-		log.info(message);
 		
-		//getServer().getPluginManager().callEvent(event);
+		//log.info(message);
+		getServer().getConsoleSender().sendMessage(message);//this should remove the [AcousticChat] prefix
+		//TODO: colour this in a way to indicate who heard it
 		
-		sender.sendMessage(message);
-		
-		boolean sentOne = false;
 		@SuppressWarnings("unchecked")
 		List<Player> players = (List<Player>) Bukkit.getOnlinePlayers();
 		
+		boolean sentOne = false;
 		for (int i = 0;i < players.size();i++) {
 			Player p = players.get(i);
 			if (p.getUniqueId().equals(sender.getUniqueId())) continue; //message already sent to themselves
@@ -109,11 +118,6 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		cooldown.put(sender, System.currentTimeMillis());
 	}
 	
-	private boolean isVowel(char c) {
-		for (char n : vowels) if (n == Character.toLowerCase(c)) return true;
-		return false;
-	}
-	
 	private String fixColor(String text) {
 		return ChatColor.translateAlternateColorCodes('&', text);
 	}
@@ -141,48 +145,95 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		//Pi radians is 180 degrees which should be max angle between vectors
 		return entropy;
 	}
+	
+	private void removeDisabled(Set<String> rules, ConfigurationSection section){
+		Iterator<String> iter = rules.iterator();
+		while (iter.hasNext()) {
+			if (!section.getBoolean(iter.next()+".enabled"))
+				iter.remove();
+		}
+	}
+	
+	private int sumWeights(ArrayList<Rule> rules) {
+		int weightSum = 0;
+		for (Rule r : rules)
+			weightSum += (r.getWeight() > 0) ? r.getWeight():0;
+		return weightSum;
+	}
 
 	//r.nextDouble() is between 0 and 1
-	private String addNoise(String original, double entropy) {
-		final double vowelConsonantRatio = 3.7;//how much more likely than vowels are consonant letters to be misheard
-		final double asteriskOmmission = 0.3;//probability that an asterisk gets removed
-		final double asteriskCloning = 0.4;//probability that an asterisk is replaced by adjacent letter
-		//the rest is probability it remains asterisk
+	private String addNoise(String message, double entropy) {
+		final String nei = "noiseEffects.insertion";
+		final String neo = "noiseEffects.omission";
+		ConfigurationSection insertion = getConfig().getConfigurationSection(nei);
+		ConfigurationSection omission = getConfig().getConfigurationSection(neo);
 		
-		char chars[] = original.toCharArray();
-		int num_asterisk = (int) (entropy * chars.length);
+		Set<String> iRules = insertion.getKeys(false);
+		Set<String> oRules = omission.getKeys(false);
 		
-		ArrayList<Integer> consIndexes = new ArrayList<Integer>();
-		ArrayList<Integer> vowelIndexes = new ArrayList<Integer>();
-		for (int i = 0;i < chars.length;i++) {
-			if (isVowel(chars[i])) vowelIndexes.add(i);
-			else consIndexes.add(i);
+		removeDisabled(iRules, insertion);
+		removeDisabled(oRules, omission);
+		ArrayList<Rule> rules = new ArrayList<Rule>();
+		
+		for (String ruleKey : iRules) {
+			rules.add(new InsertRule(
+					insertion.getInt(ruleKey+".weighting"),
+					insertion.getString(ruleKey+".match"),
+					insertion.getString(ruleKey+".values")
+				)
+			);
 		}
 		
-		while (num_asterisk-- > 0) {
-			ArrayList<Integer> selected = vowelIndexes;
-			if (consIndexes.size() == 0) selected = vowelIndexes;
-			else if (vowelIndexes.size() == 0) selected = consIndexes;
-			else if (r.nextDouble() > 1.0/vowelConsonantRatio) selected = consIndexes;
-		
-			int chosen = r.nextInt(selected.size());
-			chars[selected.get(chosen)] = '*';
-			selected.remove(chosen);
+		for (String ruleKey : oRules) {
+			rules.add(new Rule(
+					omission.getInt(ruleKey+".weighting"),
+					omission.getString(ruleKey+".match")
+				)
+			);
 		}
 		
-		List<Character> asterisked = new ArrayList<Character>();
-		for (int i = 0;i < chars.length;i++) {
-			if (chars[i] != '*') {
-				asterisked.add(chars[i]);
-				continue;
+		int weightSum = sumWeights(rules);
+		
+		String noiseMessage = message;
+		
+		for (Rule rule : rules) {
+			Pattern rulePattern = Pattern.compile(rule.getMatch());
+			Matcher m = rulePattern.matcher(noiseMessage);
+			
+			int num_matches = 0;
+			while (m.find()) num_matches++;
+			m.reset();
+			
+			//TODO: dont count num_matches if rule weight <= 0
+			int num_insertions = (rule.getWeight() < 0) ? num_matches:(int) Math.round(num_matches * ((double)(rule.getWeight()) / weightSum) * entropy);
+			
+			Generex strings = null;
+			if (rule instanceof InsertRule)
+				strings = new Generex(((InsertRule) rule).getValues());
+			
+			StringBuilder sb = new StringBuilder();
+			
+			int pos = 0;
+			while (m.find()) {
+				sb.append(noiseMessage, pos, m.start());
+				if (r.nextInt(num_matches) < num_insertions) {
+					num_insertions--;
+					if (rule instanceof InsertRule)
+						sb.append(strings.random());
+					else {
+						pos = m.end();
+						num_matches--;
+						continue;
+					}
+				}
+				sb.append(noiseMessage, m.start(), m.end());
+				pos = m.end();
+				num_matches--;
 			}
-			double x = r.nextDouble();
-			if (x < asteriskOmmission) continue;
-			else if (i < chars.length - 1 && x > asteriskOmmission && x < asteriskOmmission + asteriskCloning)
-				chars[i] = chars[i+1];
-			asterisked.add(chars[i]);
+			sb.append(noiseMessage, pos, noiseMessage.length());//in case pos still = 0
+			noiseMessage = sb.toString();
 		}
 		
-		return asterisked.toString().substring(1, 3 * asterisked.size() - 1).replaceAll(", ", ""); 
+		return noiseMessage;
 	}
 }

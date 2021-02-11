@@ -1,25 +1,78 @@
-maxDistance: 50 #maximum distance at which a player can be heard, this can be exceeded if entropyRandomFlucuation is not 0
-entropyRandomFlucuation: 0.05 #between 0 and 1, set to 0 if you want to always lose the same amount of characters per distance
-obeyInverseSquareLaw: true #http://hyperphysics.phy-astr.gsu.edu/hbase/Acoustic/invsqs.html, becomes linear with distance if false
+#maximum distance at which a player can be heard, this can be exceeded if entropyRandomFlucuation is not 0
+maxDistance: 50
+
+#between 0 and 1, set to 0 if you want to always lose the same amount of information from the same position
+entropyRandomFlucuation: 0.05
+
+#http://hyperphysics.phy-astr.gsu.edu/hbase/Acoustic/invsqs.html, becomes linear with distance if false
+obeyInverseSquareLaw: true
+
 opsAlwaysHeard: true
 opsHearEverything: true
 
-messageWhenNoListeners: #When nobody hears their message should the player be alerted?
+#When nobody hears their message should the player be alerted?
+messageWhenNoListeners:
   enabled: false
   cooldown: 5 #integer number of seconds, setting this to zero may slightly increase server performance
   notifyIfOpHears: false #Set to true if the message should be sent in the case where only ops hear them
   message: "Nobody heard you..."
 
-hideSender: #When a player is too far, their username will be unknown but their message may be heard
+#When a player is too far, their username will be unknown but their message may be heard
+hideSender:
   enabled: true
   minEntropy: 0.85 #between 0 and 1, when this is exceeded, username is hidden
-  senderName: "?" #e.g: (<?> message) instead of (<username> message)
+  senderName: "?" #e.g (<?> message) instead of (<username> message)
 
-lineOfSight: #if the receiver is not in line of sight with sender, should the entropy be increased?
+#If the receiver is not in line of sight with sender, should the entropy be increased?
+lineOfSight: 
   enabled: true
   weighting: 0.2 #Between 0 and 1. Having weighting equal to 0 is the same as disabiling this feature but performancewise it's better to just disable it
 
-senderFacing: #if the sender is not facing the receiver, should the entropy be increased? This is proportional to the angle difference
+#If the sender is not facing the receiver, should the entropy be increased? This is proportional to the angle difference
+senderFacing: 
   enabled: true
   weighting: 0.15 #between 0 and 1
 
+#Configure the effect of entropy on a message
+#The keys 'match' and 'values' accept regular expressions (regex). Do be careful with them,
+#especially for 'values'
+noiseEffects:
+  insertBeforeOmitting: true
+  
+  #The sum of all positive weightings corresponds to the value of entropy.
+  #The weighting of an individual rule is a fraction of this sum and this
+  #fraction is the % of matches that will have a random value from the 'values'
+  #inserted behind them
+  #the value that is chosen from 'values' is a random string accepted by the specified regex
+  #The rules are executed sequentially on the message
+  #it is more readable to keep the sum of all enabled rules weightings a power of 10
+  insertion: #Order of rules matter
+    rule1a: #The name doesn't matter, you can add as many of these blocks
+      enabled: false
+      match: ' ' # These will be looked for within the message
+      values: '&r' # These will be inserted behind occurances of matches
+      weighting: -1 # -1 means definite, will happen for sure for every match   
+    rule1b:
+      enabled: false
+      match: ' '
+      values: '[&0&8&7]'
+      weighting: 100
+    rule2:
+      enabled: true
+      match: '' #This is "" and not "*" because "*" matches everything multiple times
+      values: '[\*\?]' #The strings defined here are "?" and "*"
+      weighting: 70 #Can be any whole number, it is relative to the weighting of other enabled rules
+    rule3:
+      enabled: true
+      match: '[aeiou]'
+      values: '[aeiou]'
+      weighting: 10
+  omission:
+    rule1: #remove spaces
+      enabled: true
+      match: ' '
+      weighting: 5
+    rule2: #remove letters
+      enabled: true
+      match: '[a-zA-Z]'
+      weighting: 15
