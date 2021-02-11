@@ -1,18 +1,16 @@
 package acousticChat;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.logging.Logger;
 import java.util.Random;
 import java.util.Set;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
-import java.util.ArrayList;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
-
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.ConfigurationSection;
@@ -46,9 +44,6 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		getCommand("ac").setExecutor(new AC_commands(this));
 		saveResource("config.yml", false);
 		
-		log.info(addNoise("test hello the cake is a lie", 0.5));
-		
-		//log.info("Hello from Cabbache");//performance
 		log.info("Max distance set to " + getConfig().getInt("maxDistance"));
 	}
 	
@@ -71,12 +66,11 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		String mformat = event.getFormat();
 		String senderName = sender.getDisplayName();
 		String messageText = event.getMessage();
-		getConfig().getList("abc");
 		
 		String message = applyFormat(mformat, senderName, messageText);
 		
-		//log.info(message);
-		getServer().getConsoleSender().sendMessage(message);//this should remove the [AcousticChat] prefix
+		getServer().getConsoleSender().sendMessage(message);
+		sender.sendMessage(message);
 		//TODO: colour this in a way to indicate who heard it
 		
 		@SuppressWarnings("unchecked")
@@ -146,14 +140,6 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		return entropy;
 	}
 	
-	private void removeDisabled(Set<String> rules, ConfigurationSection section){
-		Iterator<String> iter = rules.iterator();
-		while (iter.hasNext()) {
-			if (!section.getBoolean(iter.next()+".enabled"))
-				iter.remove();
-		}
-	}
-	
 	private int sumWeights(ArrayList<Rule> rules) {
 		int weightSum = 0;
 		for (Rule r : rules)
@@ -161,39 +147,25 @@ public class AcousticChat extends JavaPlugin implements Listener {
 		return weightSum;
 	}
 
-	//r.nextDouble() is between 0 and 1
-	private String addNoise(String message, double entropy) {
-		final String nei = "noiseEffects.insertion";
-		final String neo = "noiseEffects.omission";
-		ConfigurationSection insertion = getConfig().getConfigurationSection(nei);
-		ConfigurationSection omission = getConfig().getConfigurationSection(neo);
+	public String addNoise(String message, double entropy) {
+		ConfigurationSection effects = getConfig().getConfigurationSection("noiseEffects");
+		Set<String> ruleKeys = effects.getKeys(false);
 		
-		Set<String> iRules = insertion.getKeys(false);
-		Set<String> oRules = omission.getKeys(false);
-		
-		removeDisabled(iRules, insertion);
-		removeDisabled(oRules, omission);
 		ArrayList<Rule> rules = new ArrayList<Rule>();
-		
-		for (String ruleKey : iRules) {
-			rules.add(new InsertRule(
-					insertion.getInt(ruleKey+".weighting"),
-					insertion.getString(ruleKey+".match"),
-					insertion.getString(ruleKey+".values")
-				)
-			);
-		}
-		
-		for (String ruleKey : oRules) {
+		for (String ruleKey : ruleKeys) {
+			if (effects.contains(ruleKey+".enabled") && !effects.getBoolean(ruleKey+".enabled"))
+				continue;
 			rules.add(new Rule(
-					omission.getInt(ruleKey+".weighting"),
-					omission.getString(ruleKey+".match")
+					effects.contains(ruleKey+".weighting", false) ? effects.getInt(ruleKey+".weighting"):-1,
+					effects.contains(ruleKey+".match", false) ? effects.getString(ruleKey+".match"):"",
+					fixColor(effects.contains(ruleKey+".before", false) ? effects.getString(ruleKey+".before"):""),
+					fixColor(effects.contains(ruleKey+".after", false) ? effects.getString(ruleKey+".after"):""),
+					effects.contains(ruleKey+".remove", false) ? effects.getBoolean(ruleKey+".remove"):false
 				)
 			);
 		}
 		
 		int weightSum = sumWeights(rules);
-		
 		String noiseMessage = message;
 		
 		for (Rule rule : rules) {
@@ -204,30 +176,28 @@ public class AcousticChat extends JavaPlugin implements Listener {
 			while (m.find()) num_matches++;
 			m.reset();
 			
-			//TODO: dont count num_matches if rule weight <= 0
+			//TODO: don't count num_matches if rule weight <= 0
 			int num_insertions = (rule.getWeight() < 0) ? num_matches:(int) Math.round(num_matches * ((double)(rule.getWeight()) / weightSum) * entropy);
 			
-			Generex strings = null;
-			if (rule instanceof InsertRule)
-				strings = new Generex(((InsertRule) rule).getValues());
+			Generex before = new Generex(rule.getBefore());
+			Generex after = new Generex(rule.getAfter());
 			
 			StringBuilder sb = new StringBuilder();
-			
 			int pos = 0;
+			
 			while (m.find()) {
 				sb.append(noiseMessage, pos, m.start());
 				if (r.nextInt(num_matches) < num_insertions) {
+					sb.append(before.random());
+					if (!rule.doRemove())
+						sb.append(noiseMessage, m.start(), m.end());
+					sb.append(after.random());
+					pos = m.end();
 					num_insertions--;
-					if (rule instanceof InsertRule)
-						sb.append(strings.random());
-					else {
-						pos = m.end();
-						num_matches--;
-						continue;
-					}
+				} else {
+					sb.append(noiseMessage, m.start(), m.end());
+					pos = m.end();
 				}
-				sb.append(noiseMessage, m.start(), m.end());
-				pos = m.end();
 				num_matches--;
 			}
 			sb.append(noiseMessage, pos, noiseMessage.length());//in case pos still = 0

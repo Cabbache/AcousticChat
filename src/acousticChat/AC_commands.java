@@ -26,7 +26,16 @@ public class AC_commands implements CommandExecutor{
 			plugin.reloadConfig();
 			sender.sendMessage("AcousticChat reloaded");
 			return true;
-		}
+		} else if (args[0].equals("noise")) {
+			if (args.length < 3) return false;
+			StringBuilder text = new StringBuilder();
+			for (int i = 2;i < args.length;i++) {
+				text.append(args[i]);
+				if (i != args.length - 1) text.append(" ");
+			}
+			sender.sendMessage(plugin.addNoise(text.toString(), Double.parseDouble(args[1])));
+			return true;
+		}//might be better to have else and put return false in that
 		return false;
     }
 }

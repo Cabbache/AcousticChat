@@ -33,46 +33,50 @@ senderFacing:
   enabled: true
   weighting: 0.15 #between 0 and 1
 
-#Configure the effect of entropy on a message
-#The keys 'match' and 'values' accept regular expressions (regex). Do be careful with them,
-#especially for 'values'
+#Configure a set of rules that define how entropy affects a message
+
+#Rule parameters:
+# enabled: true or false, default is true
+# match: This is the regex that defines what to look for in the message, default is '.'
+# before: This is the regex from which a random string is selected and placed behind matches, default '.'
+# after: Like above but in front of the match
+# weighting: an integer that tells how much a rule should have an effect, if its negative such as -1 then it will have an effect on every match. It has no range since its a % from the sum of all weights
+# remove: true or false, the matched substring in message will be removed if true
+
+#https://www.jrebel.com/blog/java-regular-expressions-cheat-sheet
+#Only use single quotes
+#The rules are executed sequentially on the message, you can add other rules with any name
 noiseEffects:
-  insertBeforeOmitting: true
-  
-  #The sum of all positive weightings corresponds to the value of entropy.
-  #The weighting of an individual rule is a fraction of this sum and this
-  #fraction is the % of matches that will have a random value from the 'values'
-  #inserted behind them
-  #the value that is chosen from 'values' is a random string accepted by the specified regex
-  #The rules are executed sequentially on the message
-  #it is more readable to keep the sum of all enabled rules weightings a power of 10
-  insertion: #Order of rules matter
-    rule1a: #The name doesn't matter, you can add as many of these blocks
-      enabled: false
-      match: ' ' # These will be looked for within the message
-      values: '&r' # These will be inserted behind occurances of matches
-      weighting: -1 # -1 means definite, will happen for sure for every match   
-    rule1b:
-      enabled: false
-      match: ' '
-      values: '[&0&8&7]'
-      weighting: 100
-    rule2:
-      enabled: true
-      match: '' #This is "" and not "*" because "*" matches everything multiple times
-      values: '[\*\?]' #The strings defined here are "?" and "*"
-      weighting: 70 #Can be any whole number, it is relative to the weighting of other enabled rules
-    rule3:
-      enabled: true
-      match: '[aeiou]'
-      values: '[aeiou]'
-      weighting: 10
-  omission:
-    rule1: #remove spaces
-      enabled: true
-      match: ' '
-      weighting: 5
-    rule2: #remove letters
-      enabled: true
-      match: '[a-zA-Z]'
-      weighting: 15
+  spaces: #Remove spaces
+    enabled: true
+    match: ' '
+    remove: true
+    weighting: 5
+  letters: #Remove letters and numbers
+    enabled: true
+    match: '[a-zA-Z0-9]' # These will be looked for within the message
+    remove: true
+    weighting: 15
+  unheardSymbols: #Replace characters with * and ?
+    enabled: true
+    match: '.' #This is '.' and not '' because removing '' does not have an effect
+    before: '[\*\?]' #The strings defined here are "?" and "*"
+    remove: true 
+    weighting: 70 #Can be any whole number, it is relative to the weighting of other enabled rules
+  addVowels: #Adds a random vowel behind vowels
+    enabled: true
+    match: '[aeiou]'
+    before: '[aeiou]'
+    weighting: 10
+  fadeLetter: #Colors individual letters
+    enabled: false
+    match: '.' 
+    before: '(&0)|(&7)|(&8)'
+    after: '&r'
+    weighting: 100 #If this is -1, then the rule will be executed for every match
+  fadeWord: #Colors words
+    enabled: false
+    match: '(^| )[^ ]+' #(The start of a string or a space) followed by anything of any length that has a space aferwards
+    before: '(&0)|(&7)|(&8)'
+    after: '&r'
+    weighting: 100

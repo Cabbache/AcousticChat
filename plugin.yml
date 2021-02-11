@@ -5,5 +5,5 @@ api-version: 1.13
 commands:
   ac:
     description: AcousticChat commands
-    usage: /ac reload
+    usage: /ac reload or /ac noise <number between 0 and 1> <text>
     
